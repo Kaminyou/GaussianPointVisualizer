@@ -1,0 +1,32 @@
+version: '3'
+services:
+  frontend:
+    build: 
+      context: ./frontend/
+      dockerfile: frontend.dev.Dockerfile
+    container_name: ono-visualize-frontend
+    ports:
+      - 43000:3000
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./frontend:/root/frontend
+    working_dir: /root/frontend
+  backend:
+    build:
+      context: ./backend/
+      dockerfile: backend.Dockerfile
+    container_name: ono-visualize-backend
+    environment:
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=project.server.config.DevelopmentConfig
+    working_dir: /root/backend
+    volumes:
+      - ./backend:/root/backend
+    ports:
+      - 43001:5000
+    stdin_open: true
+    tty: true
+    # command: python3 -m gunicorn -c config.py wsgi:app
