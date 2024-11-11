@@ -19,9 +19,11 @@ const PointCloudAndGaussianVisualizer = () => {
   const [dataName, setDataName] = useState('');
   const [dataNames, setDataNames] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState('density');
-  const [clippingDistance, setClippingDistance] = useState(0);  // Clipping distance state
+  const [clippingDistance, setClippingDistance] = useState(100);  // Clipping distance state
   const [pointSizeDisplay, setPointSizeDisplay] = useState(pointSizeRef.current);  // Displayed point size value
 
+  const [minValue, setMinValue] = useState(null);
+  const [maxValue, setMaxValue] = useState(null);
   const colormaps = ['gist_rainbow', 'coolwarm', 'viridis', 'plasma', 'inferno', 'magma', 'cividis'];
   const visualizedProperties = ['density', 'shape'];
 
@@ -80,6 +82,8 @@ const PointCloudAndGaussianVisualizer = () => {
 
         renderPointCloudNew(scene, point_cloud, colors);
         renderColorbar(min_value, max_value, color_gradient);
+        setMinValue(min_value);
+        setMaxValue(max_value);
 
         setLoading(false);
       })
@@ -126,18 +130,12 @@ const PointCloudAndGaussianVisualizer = () => {
   const renderColorbar = (minDensity, maxDensity, colorGradient) => {
     const canvas = colorbarRef.current;
     const ctx = canvas.getContext('2d');
-
+  
     colorGradient.forEach((color, i) => {
       const [r, g, b] = color;
       ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
       ctx.fillRect((canvas.width / colorGradient.length) * i, 0, canvas.width / colorGradient.length, canvas.height);
     });
-
-    ctx.fillStyle = '#000';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(minDensity.toFixed(2), 20, canvas.height - 5);
-    ctx.fillText(maxDensity.toFixed(2), canvas.width - 20, canvas.height - 5);
   };
 
   // Update clipping plane constant based on slider
@@ -158,77 +156,116 @@ const PointCloudAndGaussianVisualizer = () => {
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Dropdown for colormap selection */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="colormap-select">Select Colormap: </label>
-        <select
-          id="colormap-select"
-          value={colormap}
-          onChange={(e) => setColormap(e.target.value)}
-        >
-          {colormaps.map((cmap) => (
-            <option key={cmap} value={cmap}>{cmap}</option>
-          ))}
-        </select>
-      </div>
-      {/* Dropdown for property selection */}
-      <div style={{ position: 'absolute', top: '60px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="property-select">Select Property: </label>
-        <select
-          id="property-select"
-          value={selectedProperty}
-          onChange={(e) => setSelectedProperty(e.target.value)}
-        >
-          {visualizedProperties.map((visualizedProperty) => (
-            <option key={visualizedProperty} value={visualizedProperty}>{visualizedProperty}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Dropdown for data name selection */}
-      <div style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="data-select">Select Data: </label>
-        <select
-          id="data-select"
-          value={dataName}
-          onChange={(e) => setDataName(e.target.value)}
-        >
-          {dataNames.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Slider for Clipping Distance */}
-      <div style={{ position: 'absolute', top: '140px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="clipping-slider">Clipping Distance: {clippingDistance}</label>
-        <input
-          type="range"
-          id="clipping-slider"
-          min="-100"
-          max="100"
-          step="1"
-          value={clippingDistance}
-          onChange={(e) => setClippingDistance(parseFloat(e.target.value))}
-          style={{ width: '300px' }}
-        />
-      </div>
-
-      {/* Slider for Point Size */}
-      <div style={{ position: 'absolute', top: '180px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="point-size-slider">Point Size: {pointSizeDisplay}</label>
-        <input
-          type="range"
-          id="point-size-slider"
-          min="0.1"
-          max="3"
-          step="0.1"
-          value={pointSizeDisplay}
-          onChange={handlePointSizeChange}
-          style={{ width: '300px' }}
-        />
-      </div>
+      {/* Adjustment Panel */}
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        left: '20px',
+        zIndex: 10,
+        padding: '20px',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: '8px',
+        color: 'white',
+        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.3)',
+        maxWidth: '300px'
+      }}>
+        {/* Dropdown for colormap selection */}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="colormap-select" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Select Colormap:</label>
+          <select
+            id="colormap-select"
+            value={colormap}
+            onChange={(e) => setColormap(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              backgroundColor: '#222',
+              color: 'white'
+            }}
+          >
+            {colormaps.map((cmap) => (
+              <option key={cmap} value={cmap}>{cmap}</option>
+            ))}
+          </select>
+        </div>
   
+        {/* Dropdown for property selection */}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="property-select" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Select Property:</label>
+          <select
+            id="property-select"
+            value={selectedProperty}
+            onChange={(e) => setSelectedProperty(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              backgroundColor: '#222',
+              color: 'white'
+            }}
+          >
+            {visualizedProperties.map((property) => (
+              <option key={property} value={property}>{property}</option>
+            ))}
+          </select>
+        </div>
+  
+        {/* Dropdown for data name selection */}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="data-select" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Select Data:</label>
+          <select
+            id="data-select"
+            value={dataName}
+            onChange={(e) => setDataName(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              backgroundColor: '#222',
+              color: 'white'
+            }}
+          >
+            {dataNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+  
+        {/* Slider for Clipping Distance */}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="clipping-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Clipping Distance: {clippingDistance}</label>
+          <input
+            type="range"
+            id="clipping-slider"
+            min="-100"
+            max="100"
+            step="1"
+            value={clippingDistance}
+            onChange={(e) => setClippingDistance(parseFloat(e.target.value))}
+            style={{ width: '100%' }}
+          />
+        </div>
+  
+        {/* Slider for Point Size */}
+        <div>
+          <label htmlFor="point-size-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Point Size: {pointSizeDisplay}</label>
+          <input
+            type="range"
+            id="point-size-slider"
+            min="0.1"
+            max="3"
+            step="0.1"
+            value={pointSizeDisplay}
+            onChange={handlePointSizeChange}
+            style={{ width: '100%' }}
+          />
+        </div>
+      </div>
+    
       {loading && (
         <div style={{
           position: 'absolute',
@@ -255,21 +292,31 @@ const PointCloudAndGaussianVisualizer = () => {
           <div style={{ marginTop: '5px' }}>{progress}%</div>
         </div>
       )}
-  
+    
       <div ref={mountRef} style={{ width: '100vw', height: '100vh' }}></div>
-  
+    
       {/* Colorbar and explanation text container */}
       <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-        <canvas
-          ref={colorbarRef}
-          width={400}
-          height={20}
-          style={{ border: '1px solid black' }}
-        ></canvas>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Minimum density label */}
+          {minValue !== null && <span style={{ color: 'white' }}>{minValue.toFixed(2)}</span>}
+          
+          {/* Colorbar canvas */}
+          <canvas
+            ref={colorbarRef}
+            width={400}
+            height={20}
+            style={{ border: '1px solid black' }}
+          ></canvas>
+          
+          {/* Maximum density label */}
+          {maxValue !== null && <span style={{ color: 'white' }}>{maxValue.toFixed(2)}</span>}
+        </div>
         <p style={{ marginTop: '5px', color: 'white' }}>{explanationText}</p>
       </div>
     </div>
   );
+  
 };
 
 export default PointCloudAndGaussianVisualizer;
