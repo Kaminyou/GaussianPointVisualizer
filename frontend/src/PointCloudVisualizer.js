@@ -41,7 +41,7 @@ const PointCloudAndGaussianVisualizer = () => {
     camera.position.z = 500;
   
     // Axios request with progress handling
-    axios.get(`/get-pointcloud?colormap=${selectedColormap}`, {
+    axios.get(`/api/get-pointcloud?colormap=${selectedColormap}`, {
       onDownloadProgress: (progressEvent) => {
         let total = progressEvent.total || 1024 * 1024 * 10;
         const percentage = Math.round((progressEvent.loaded * 100) / total);

@@ -97,7 +97,7 @@ def get_version():
         return {"msg": "Internal Server Error!"}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-@app.route('/get-pointcloud', methods=['GET'])
+@app.route('/api/get-pointcloud', methods=['GET'])
 def get_pointcloud():
     # Load the .npy file (replace 'path_to_file.npy' with your actual file path)
     point_cloud_and_labels = np.load('data/day9_sample1_0_output_clean.npy', allow_pickle=True).item()
