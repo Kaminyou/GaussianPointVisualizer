@@ -11,13 +11,7 @@ from flask_cors import CORS
 from PIL import Image
 
 from utils.contour import Contour
-
-# @dataclass
-# class Contour:
-#     segments: npt.NDArray[int]
-#     center: npt.NDArray[int]
-#     intensity: float
-
+from matplotlib import cm
 
 app = Flask(__name__)
 CORS(app)
@@ -106,9 +100,10 @@ def get_version():
 @app.route('/get-pointcloud', methods=['GET'])
 def get_pointcloud():
     # Load the .npy file (replace 'path_to_file.npy' with your actual file path)
-    point_cloud_and_labels = np.load('data/day19_sample1_0_output_clean.npy', allow_pickle=True).item()
+    point_cloud_and_labels = np.load('data/day9_sample1_0_output_clean.npy', allow_pickle=True).item()
     point_cloud = point_cloud_and_labels['points']
     labels = point_cloud_and_labels['labels']
+    new_labels = point_cloud_and_labels['new_labels']
 
     max_values = point_cloud.max(axis=0)
     min_values = point_cloud.min(axis=0)
@@ -117,29 +112,38 @@ def get_pointcloud():
     point_cloud = (point_cloud - center) / rng * 100
     point_cloud_list = point_cloud.tolist()
 
-    gaussian_data = np.load('data/day19_sample1_0_output_clean_gaussians.npy', allow_pickle=True).item()  # Assuming a dictionary structure
+    gaussian_data = np.load('data/day9_sample1_0_output_clean_gaussians.npy', allow_pickle=True).item()  # Assuming a dictionary structure
     means = gaussian_data['means']
     covariances = gaussian_data['covs']
+    densities_log = gaussian_data['densities_log']
+
+    min_density = densities_log.min()
+    max_density = densities_log.max()
+    normalized_densities = (densities_log - min_density) / (max_density - min_density)
+
+    # Map normalized densities to RGB colors using coolwarm colormap
+    colormap_name = request.args.get('colormap', 'coolwarm')
+    colormap = cm.get_cmap(colormap_name)
+    colors = [colormap(density)[:3] for density in normalized_densities]  # Extract RGB values
+    pointcolors = []
+    for new_label in new_labels:
+        pointcolors.append(colors[new_label])
+
+    gradient_colors = [colormap(i / 100)[:3] for i in range(101)]  # 101 steps from 0 to 1
+    gradient_colors = [[int(c * 255) for c in color] for color in gradient_colors]  # Convert to 0-255 range
+
+    explanation_text = "This colorbar represents density values: cool colors indicate lower densities, while warm colors indicate higher densities."
 
     means = (means - center) / rng * 100
     covariances = covariances / rng * 100
-    # print(point_cloud.max(axis=0))
-    # print(point_cloud.min(axis=0))
-    # point_cloud = (point_cloud - min_value) / (max_value - min_value)
-    
-    # Convert to a list of lists for JSON serialization
-    # point_cloud_list = point_cloud.tolist()
-    # point_cloud_list = np.random.uniform(low=-100.0, high=100.0, size=(10, 3))
-    # point_cloud_list = point_cloud_list.tolist()
-    # print(point_cloud_list)
 
     response = {
         'point_cloud': point_cloud_list,  # Point cloud data
-        'labels': labels.tolist(),
-        'gaussians': {
-            'means': means.tolist(),  # Gaussian means
-            'covariances': covariances.tolist()  # Gaussian covariance matrices
-        }
+        "colors": pointcolors,  # Send colors as an array of RGB lists
+        'min_density': float(min_density),
+        'max_density': float(max_density),
+        'explanation_text': explanation_text,
+        'color_gradient': gradient_colors,
     }
     
     return jsonify(response)
