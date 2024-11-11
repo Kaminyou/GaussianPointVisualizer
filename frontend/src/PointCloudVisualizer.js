@@ -11,37 +11,51 @@ const PointCloudAndGaussianVisualizer = () => {
   const [colorGradient, setColorGradient] = useState([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [colormap, setColormap] = useState('coolwarm');  // Colormap state
+  const [colormap, setColormap] = useState('coolwarm');
+  const [dataName, setDataName] = useState('');
+  const [dataNames, setDataNames] = useState([]);  // List of available data names
 
   // Available colormaps
   const colormaps = ['coolwarm', 'viridis', 'plasma', 'inferno', 'magma', 'cividis'];
 
+  // Fetch available data names on component mount
   useEffect(() => {
-    fetchPointCloudData(colormap);
-  }, [colormap]);
+    axios.get('/api/get_data_names')
+      .then(response => {
+        setDataNames(response.data.data_name);  // Assuming the response is an array of data names
+        setDataName(response.data.data_name[0]);  // Set the default data name to the first one
+      })
+      .catch(error => console.error("Error fetching data names:", error));
+  }, []);
 
-  const fetchPointCloudData = (selectedColormap) => {
+  // Fetch the point cloud data whenever colormap or dataName changes
+  useEffect(() => {
+    if (dataName) {
+      fetchPointCloudData(colormap, dataName);
+    }
+  }, [colormap, dataName]);
+
+  const fetchPointCloudData = (selectedColormap, selectedDataName) => {
     setLoading(true);
     setProgress(0);
-  
+
     // Clear any existing renderer
     if (mountRef.current.firstChild) {
       mountRef.current.removeChild(mountRef.current.firstChild);
     }
-  
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     mountRef.current.appendChild(renderer.domElement);
-  
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
     camera.position.z = 500;
-  
-    // Axios request with progress handling
-    axios.get(`/api/get-pointcloud?colormap=${selectedColormap}`, {
+
+    axios.get(`/api/get-pointcloud?colormap=${selectedColormap}&dataname=${selectedDataName}`, {
       onDownloadProgress: (progressEvent) => {
         let total = progressEvent.total || 1024 * 1024 * 10;
         const percentage = Math.round((progressEvent.loaded * 100) / total);
@@ -50,33 +64,33 @@ const PointCloudAndGaussianVisualizer = () => {
     })
       .then(response => {
         const { point_cloud, colors, min_density, max_density, explanation_text, color_gradient } = response.data;
-  
+
         setDensityRange({ min: min_density, max: max_density });
         setExplanationText(explanation_text);
         setColorGradient(color_gradient);
-  
+
         // Clear existing objects in the scene
         while (scene.children.length > 0) {
           scene.remove(scene.children[0]);
         }
-  
+
         renderPointCloudNew(scene, point_cloud, colors);
-        renderColorbar(min_density, max_density, color_gradient);  // Update colorbar content
-  
+        renderColorbar(min_density, max_density, color_gradient);
+
         setLoading(false);
       })
       .catch(err => {
         console.error("Error fetching point cloud and Gaussian data", err);
         setLoading(false);
       });
-  
+
     const animate = () => {
       requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     };
     animate();
-  
+
     return () => {
       if (mountRef.current.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);
@@ -130,6 +144,20 @@ const PointCloudAndGaussianVisualizer = () => {
         >
           {colormaps.map((cmap) => (
             <option key={cmap} value={cmap}>{cmap}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Dropdown for data name selection */}
+      <div style={{ position: 'absolute', top: '60px', left: '20px', zIndex: 10, color: 'white'}}>
+        <label htmlFor="data-select">Select Data: </label>
+        <select
+          id="data-select"
+          value={dataName}
+          onChange={(e) => setDataName(e.target.value)}
+        >
+          {dataNames.map((name) => (
+            <option key={name} value={name}>{name}</option>
           ))}
         </select>
       </div>
