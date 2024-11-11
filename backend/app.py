@@ -80,15 +80,36 @@ def get_pointcloud():
     means = gaussian_data['means']
     covariances = gaussian_data['covs']
     densities_log = gaussian_data['densities_log']
+    ratio_eigenvalues = gaussian_data['ratio_eigenvalues']
 
     min_density = densities_log.min()
     max_density = densities_log.max()
     normalized_densities = (densities_log - min_density) / (max_density - min_density)
 
+    min_ratio = ratio_eigenvalues.min()
+    max_ratio = ratio_eigenvalues.max()
+    normalized_ratios = (ratio_eigenvalues - min_ratio) / (max_ratio - min_ratio)
+
+    # visualized property
+    visualized_property = request.args.get('visualizedProperty', 'density')
+    if visualized_property == 'density':
+        normalized_values = normalized_densities
+        min_value = min_density
+        max_value = max_density
+        explanation_text = "log10 density"
+
+    elif visualized_property == 'shape':
+        normalized_values = normalized_ratios
+        min_value = min_ratio
+        max_value = max_ratio
+        explanation_text = "shape (ratio of max and min axis)"
+    else:
+        raise NotImplementedError
+
     # Map normalized densities to RGB colors using coolwarm colormap
     colormap_name = request.args.get('colormap', 'coolwarm')
     colormap = cm.get_cmap(colormap_name)
-    colors = [colormap(density)[:3] for density in normalized_densities]  # Extract RGB values
+    colors = [colormap(value)[:3] for value in normalized_values]  # Extract RGB values
     pointcolors = []
     for new_label in new_labels:
         pointcolors.append(colors[new_label])
@@ -96,16 +117,14 @@ def get_pointcloud():
     gradient_colors = [colormap(i / 100)[:3] for i in range(101)]  # 101 steps from 0 to 1
     gradient_colors = [[int(c * 255) for c in color] for color in gradient_colors]  # Convert to 0-255 range
 
-    explanation_text = "log10 density"
-
     means = (means - center) / rng * 100
     covariances = covariances / rng * 100
 
     response = {
         'point_cloud': point_cloud_list,  # Point cloud data
         "colors": pointcolors,  # Send colors as an array of RGB lists
-        'min_density': float(min_density),
-        'max_density': float(max_density),
+        'min_value': float(min_value),
+        'max_value': float(max_value),
         'explanation_text': explanation_text,
         'color_gradient': gradient_colors,
     }

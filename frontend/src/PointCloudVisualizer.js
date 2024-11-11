@@ -11,12 +11,14 @@ const PointCloudAndGaussianVisualizer = () => {
   const [colorGradient, setColorGradient] = useState([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [colormap, setColormap] = useState('coolwarm');
+  const [colormap, setColormap] = useState('gist_rainbow');
   const [dataName, setDataName] = useState('');
   const [dataNames, setDataNames] = useState([]);  // List of available data names
+  const [selectedProperty, setSelectedProperty] = useState('density');
 
   // Available colormaps
-  const colormaps = ['coolwarm', 'viridis', 'plasma', 'inferno', 'magma', 'cividis'];
+  const colormaps = ['gist_rainbow', 'coolwarm', 'viridis', 'plasma', 'inferno', 'magma', 'cividis'];
+  const visualizedProperties = ['density', 'shape'];
 
   // Fetch available data names on component mount
   useEffect(() => {
@@ -31,11 +33,11 @@ const PointCloudAndGaussianVisualizer = () => {
   // Fetch the point cloud data whenever colormap or dataName changes
   useEffect(() => {
     if (dataName) {
-      fetchPointCloudData(colormap, dataName);
+      fetchPointCloudData(colormap, dataName, selectedProperty);
     }
-  }, [colormap, dataName]);
+  }, [colormap, dataName, selectedProperty]);
 
-  const fetchPointCloudData = (selectedColormap, selectedDataName) => {
+  const fetchPointCloudData = (selectedColormap, selectedDataName, selectedProperty) => {
     setLoading(true);
     setProgress(0);
 
@@ -55,7 +57,7 @@ const PointCloudAndGaussianVisualizer = () => {
     controls.dampingFactor = 0.1;
     camera.position.z = 500;
 
-    axios.get(`/api/get-pointcloud?colormap=${selectedColormap}&dataname=${selectedDataName}`, {
+    axios.get(`/api/get-pointcloud?colormap=${selectedColormap}&dataname=${selectedDataName}&visualizedProperty=${selectedProperty}`, {
       onDownloadProgress: (progressEvent) => {
         let total = progressEvent.total || 1024 * 1024 * 10;
         const percentage = Math.round((progressEvent.loaded * 100) / total);
@@ -63,9 +65,9 @@ const PointCloudAndGaussianVisualizer = () => {
       }
     })
       .then(response => {
-        const { point_cloud, colors, min_density, max_density, explanation_text, color_gradient } = response.data;
+        const { point_cloud, colors, min_value, max_value, explanation_text, color_gradient } = response.data;
 
-        setDensityRange({ min: min_density, max: max_density });
+        setDensityRange({ min: min_value, max: max_value });
         setExplanationText(explanation_text);
         setColorGradient(color_gradient);
 
@@ -75,7 +77,7 @@ const PointCloudAndGaussianVisualizer = () => {
         }
 
         renderPointCloudNew(scene, point_cloud, colors);
-        renderColorbar(min_density, max_density, color_gradient);
+        renderColorbar(min_value, max_value, color_gradient);
 
         setLoading(false);
       })
@@ -147,9 +149,22 @@ const PointCloudAndGaussianVisualizer = () => {
           ))}
         </select>
       </div>
+      {/* Dropdown for property selection */}
+      <div style={{ position: 'absolute', top: '60px', left: '20px', zIndex: 10, color: 'white'}}>
+        <label htmlFor="colormap-select">Select Property: </label>
+        <select
+          id="property-select"
+          value={selectedProperty}
+          onChange={(e) => setSelectedProperty(e.target.value)}
+        >
+          {visualizedProperties.map((visualizedProperty) => (
+            <option key={visualizedProperty} value={visualizedProperty}>{visualizedProperty}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Dropdown for data name selection */}
-      <div style={{ position: 'absolute', top: '60px', left: '20px', zIndex: 10, color: 'white'}}>
+      <div style={{ position: 'absolute', top: '100px', left: '20px', zIndex: 10, color: 'white'}}>
         <label htmlFor="data-select">Select Data: </label>
         <select
           id="data-select"
