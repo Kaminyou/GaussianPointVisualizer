@@ -6,6 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 const PointCloudAndGaussianVisualizer = () => {
   const mountRef = useRef(null);
   const colorbarRef = useRef(null);
+  const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));  // Clipping plane along Z-axis
+  const pointSizeRef = useRef(0.5);  // Point size stored in useRef for direct manipulation without re-renders
+  const pointCloudRef = useRef(null);  // Store reference to point cloud object
+
   const [densityRange, setDensityRange] = useState({ min: 0, max: 1 });
   const [explanationText, setExplanationText] = useState('');
   const [colorGradient, setColorGradient] = useState([]);
@@ -13,24 +17,23 @@ const PointCloudAndGaussianVisualizer = () => {
   const [progress, setProgress] = useState(0);
   const [colormap, setColormap] = useState('gist_rainbow');
   const [dataName, setDataName] = useState('');
-  const [dataNames, setDataNames] = useState([]);  // List of available data names
+  const [dataNames, setDataNames] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState('density');
+  const [clippingDistance, setClippingDistance] = useState(0);  // Clipping distance state
+  const [pointSizeDisplay, setPointSizeDisplay] = useState(pointSizeRef.current);  // Displayed point size value
 
-  // Available colormaps
   const colormaps = ['gist_rainbow', 'coolwarm', 'viridis', 'plasma', 'inferno', 'magma', 'cividis'];
   const visualizedProperties = ['density', 'shape'];
 
-  // Fetch available data names on component mount
   useEffect(() => {
     axios.get('/api/get_data_names')
       .then(response => {
-        setDataNames(response.data.data_name);  // Assuming the response is an array of data names
-        setDataName(response.data.data_name[0]);  // Set the default data name to the first one
+        setDataNames(response.data.data_name);
+        setDataName(response.data.data_name[0]);
       })
       .catch(error => console.error("Error fetching data names:", error));
   }, []);
 
-  // Fetch the point cloud data whenever colormap or dataName changes
   useEffect(() => {
     if (dataName) {
       fetchPointCloudData(colormap, dataName, selectedProperty);
@@ -41,7 +44,6 @@ const PointCloudAndGaussianVisualizer = () => {
     setLoading(true);
     setProgress(0);
 
-    // Clear any existing renderer
     if (mountRef.current.firstChild) {
       mountRef.current.removeChild(mountRef.current.firstChild);
     }
@@ -50,6 +52,7 @@ const PointCloudAndGaussianVisualizer = () => {
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.localClippingEnabled = true;  // Enable local clipping
     mountRef.current.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -71,7 +74,6 @@ const PointCloudAndGaussianVisualizer = () => {
         setExplanationText(explanation_text);
         setColorGradient(color_gradient);
 
-        // Clear existing objects in the scene
         while (scene.children.length > 0) {
           scene.remove(scene.children[0]);
         }
@@ -110,10 +112,14 @@ const PointCloudAndGaussianVisualizer = () => {
 
     const material = new THREE.PointsMaterial({ 
       vertexColors: true,
-      size: 0.3
+      size: pointSizeRef.current,  // Use point size from ref
+      transparent: true,
+      opacity: 0.8,
+      clippingPlanes: [clippingPlaneRef.current]  // Apply clipping plane
     });
 
     const pointCloud = new THREE.Points(geometry, material);
+    pointCloudRef.current = pointCloud;  // Store reference to point cloud object
     scene.add(pointCloud);
   };
 
@@ -134,6 +140,22 @@ const PointCloudAndGaussianVisualizer = () => {
     ctx.fillText(maxDensity.toFixed(2), canvas.width - 20, canvas.height - 5);
   };
 
+  // Update clipping plane constant based on slider
+  useEffect(() => {
+    clippingPlaneRef.current.constant = clippingDistance;
+  }, [clippingDistance]);
+
+  const handlePointSizeChange = (e) => {
+    const newSize = parseFloat(e.target.value);
+    pointSizeRef.current = newSize;
+    setPointSizeDisplay(newSize);  // Update local state to reflect slider value in UI
+
+    // Update the point cloud material's size directly if it exists
+    if (pointCloudRef.current) {
+      pointCloudRef.current.material.size = newSize;
+    }
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       {/* Dropdown for colormap selection */}
@@ -151,7 +173,7 @@ const PointCloudAndGaussianVisualizer = () => {
       </div>
       {/* Dropdown for property selection */}
       <div style={{ position: 'absolute', top: '60px', left: '20px', zIndex: 10, color: 'white'}}>
-        <label htmlFor="colormap-select">Select Property: </label>
+        <label htmlFor="property-select">Select Property: </label>
         <select
           id="property-select"
           value={selectedProperty}
@@ -176,8 +198,37 @@ const PointCloudAndGaussianVisualizer = () => {
           ))}
         </select>
       </div>
+
+      {/* Slider for Clipping Distance */}
+      <div style={{ position: 'absolute', top: '140px', left: '20px', zIndex: 10, color: 'white'}}>
+        <label htmlFor="clipping-slider">Clipping Distance: {clippingDistance}</label>
+        <input
+          type="range"
+          id="clipping-slider"
+          min="-100"
+          max="100"
+          step="1"
+          value={clippingDistance}
+          onChange={(e) => setClippingDistance(parseFloat(e.target.value))}
+          style={{ width: '300px' }}
+        />
+      </div>
+
+      {/* Slider for Point Size */}
+      <div style={{ position: 'absolute', top: '180px', left: '20px', zIndex: 10, color: 'white'}}>
+        <label htmlFor="point-size-slider">Point Size: {pointSizeDisplay}</label>
+        <input
+          type="range"
+          id="point-size-slider"
+          min="0.1"
+          max="3"
+          step="0.1"
+          value={pointSizeDisplay}
+          onChange={handlePointSizeChange}
+          style={{ width: '300px' }}
+        />
+      </div>
   
-      {/* Display loading bar with progress */}
       {loading && (
         <div style={{
           position: 'absolute',
