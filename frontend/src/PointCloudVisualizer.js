@@ -7,6 +7,15 @@ const PointCloudAndGaussianVisualizer = () => {
   const mountRef = useRef(null);
   const colorbarRef = useRef(null);
   const clippingPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));  // Clipping plane along Z-axis
+
+  const clippingPlaneZRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0));
+  const clippingPlaneXRef = useRef(new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0));
+  const clippingPlaneYRef = useRef(new THREE.Plane(new THREE.Vector3(0, -1, 0), 0));
+
+  const [clippingDistanceZ, setClippingDistanceZ] = useState(100);
+  const [clippingDistanceX, setClippingDistanceX] = useState(100);
+  const [clippingDistanceY, setClippingDistanceY] = useState(100);
+
   const pointSizeRef = useRef(0.5);  // Point size stored in useRef for direct manipulation without re-renders
   const pointCloudRef = useRef(null);  // Store reference to point cloud object
 
@@ -19,7 +28,6 @@ const PointCloudAndGaussianVisualizer = () => {
   const [dataName, setDataName] = useState('');
   const [dataNames, setDataNames] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState('density');
-  const [clippingDistance, setClippingDistance] = useState(100);  // Clipping distance state
   const [pointSizeDisplay, setPointSizeDisplay] = useState(pointSizeRef.current);  // Displayed point size value
 
   const [minValue, setMinValue] = useState(null);
@@ -106,6 +114,25 @@ const PointCloudAndGaussianVisualizer = () => {
     };
   };
 
+  const createCircleTexture = () => {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+
+    // Draw a circle in the center of the canvas
+    context.beginPath();
+    context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    context.fillStyle = '#FFFFFF';
+    context.fill();
+    context.closePath();
+
+    return new THREE.CanvasTexture(canvas);
+  };
+
+  const circleTexture = createCircleTexture();
+
   const renderPointCloudNew = (scene, points, rgbcolors) => {
     const positions = new Float32Array(points.flat());
     const colors = new Float32Array(rgbcolors.flat());
@@ -119,7 +146,9 @@ const PointCloudAndGaussianVisualizer = () => {
       size: pointSizeRef.current,  // Use point size from ref
       transparent: true,
       opacity: 0.8,
-      clippingPlanes: [clippingPlaneRef.current]  // Apply clipping plane
+      map: circleTexture,  // Use the circular texture
+      clippingPlanes: [clippingPlaneZRef.current, clippingPlaneXRef.current, clippingPlaneYRef.current],
+      alphaTest: 0.5  // Ensures transparency around the circular shape
     });
 
     const pointCloud = new THREE.Points(geometry, material);
@@ -140,8 +169,10 @@ const PointCloudAndGaussianVisualizer = () => {
 
   // Update clipping plane constant based on slider
   useEffect(() => {
-    clippingPlaneRef.current.constant = clippingDistance;
-  }, [clippingDistance]);
+    clippingPlaneZRef.current.constant = clippingDistanceZ;
+    clippingPlaneXRef.current.constant = clippingDistanceX;
+    clippingPlaneYRef.current.constant = clippingDistanceY;
+  }, [clippingDistanceZ, clippingDistanceX, clippingDistanceY]);
 
   const handlePointSizeChange = (e) => {
     const newSize = parseFloat(e.target.value);
@@ -235,17 +266,47 @@ const PointCloudAndGaussianVisualizer = () => {
           </select>
         </div>
   
-        {/* Slider for Clipping Distance */}
+        {/* Slider for Clipping Distance X*/}
         <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="clipping-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Clipping Distance: {clippingDistance}</label>
+          <label htmlFor="clipping-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Clipping Distance X: {clippingDistanceX}</label>
           <input
             type="range"
             id="clipping-slider"
             min="-100"
             max="100"
             step="1"
-            value={clippingDistance}
-            onChange={(e) => setClippingDistance(parseFloat(e.target.value))}
+            value={clippingDistanceX}
+            onChange={(e) => setClippingDistanceX(parseFloat(e.target.value))}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        {/* Slider for Clipping Distance Y*/}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="clipping-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Clipping Distance Y: {clippingDistanceY}</label>
+          <input
+            type="range"
+            id="clipping-slider"
+            min="-100"
+            max="100"
+            step="1"
+            value={clippingDistanceY}
+            onChange={(e) => setClippingDistanceY(parseFloat(e.target.value))}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        {/* Slider for Clipping Distance Z*/}
+        <div style={{ marginBottom: '15px' }}>
+          <label htmlFor="clipping-slider" style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Clipping Distance Z: {clippingDistanceZ}</label>
+          <input
+            type="range"
+            id="clipping-slider"
+            min="-100"
+            max="100"
+            step="1"
+            value={clippingDistanceZ}
+            onChange={(e) => setClippingDistanceZ(parseFloat(e.target.value))}
             style={{ width: '100%' }}
           />
         </div>
